@@ -6,6 +6,8 @@ This Python script automates the management of Python dependencies for a project
 4. Generating a `requirements.txt` file with all detected packages.
 5. Installing any missing packages using `pip`.
 
+[![CodeQL Advanced - Python](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml)
+
 ## Features
 - **Recursive File Scanning**: Automatically identifies all Python files in the specified project directory.
 - **Dependency Detection**: Extracts imported packages from the identified Python files.
