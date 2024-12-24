@@ -1,0 +1,35 @@
+name: 'Dependency Review'
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  pull-requests: write # Required for commenting in pull requests
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 'Checkout repository'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: 'Install dependencies'
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: 'Dependency Review'
+        uses: actions/dependency-review-action@v4
+        with:
+          comment-summary-in-pr: always
+          fail-on-severity: moderate # Uncomment and set as needed
+          deny-licenses: GPL-1.0-or-later, LGPL-2.0-or-later # Uncomment to enforce specific license restrictions
+          retry-on-snapshot-warnings: true
