@@ -2,6 +2,13 @@
 
 [![CodeQL Advanced - Python](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml)
 
+## Context
+A utility script to detect and install missing Python packages in a project.
+
+This module scans through Python files in a directory, identifies imported packages,
+checks which ones are missing from the current environment, generates a requirements.txt file,
+and optionally installs the missing packages using pip.
+
 ## Overview
 This Python script automates the management of Python dependencies for a project by:
 1. Recursively scanning all Python files in the project directory.
