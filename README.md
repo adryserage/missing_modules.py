@@ -1,7 +1,7 @@
 > Created by [Adryan Serage](https://github.com/adryserage)
 
 [![CodeQL Advanced - Python](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml)
-
+[![Dependency Review](https://github.com/adryserage/missing_modules.py/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/adryserage/missing_modules.py/actions/workflows/dependency-review.yml)
 
 ## Overview
 This Python script automates the management of Python dependencies for a project by:
