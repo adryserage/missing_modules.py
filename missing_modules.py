@@ -1,3 +1,10 @@
+"""A utility script to detect and install missing Python packages in a project.
+
+This module scans through Python files in a directory, identifies imported packages,
+checks which ones are missing from the current environment, generates a requirements.txt file,
+and optionally installs the missing packages using pip.
+"""
+
 import os
 import sys
 import subprocess
@@ -50,19 +57,19 @@ def install_packages(missing_packages):
 if __name__ == "__main__":
     # Root directory for your project
     root_directory = os.path.dirname(os.path.abspath(__file__))
-    
+
     # Step 1: Find all Python files
     python_files = find_python_files(root_directory)
-    
+
     # Step 2: Extract imported packages
     imported = extract_imported_packages(python_files)
-    
+
     # Step 3: Check for missing packages
     missing = check_missing_packages(imported)
-    
+
     # Step 4: Write all detected packages to requirements.txt
     write_requirements(imported)
-    
+
     # Step 5: Install missing packages
     if missing:
         print(f"Missing packages detected: {missing}")
