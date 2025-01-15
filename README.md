@@ -1,6 +1,7 @@
 > Created by [Adryan Serage](https://github.com/adryserage)
 
 [![CodeQL Advanced - Python](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml)
+[![Pylint](https://github.com/adryserage/missing_modules.py/actions/workflows/pylint.yml/badge.svg)](https://github.com/adryserage/missing_modules.py/actions/workflows/pylint.yml)
 
 ## Context
 A utility script to detect and install missing Python packages in a project.
