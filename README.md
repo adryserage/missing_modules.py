@@ -52,6 +52,9 @@ Available options:
 -  Specify custom requirements.txt location
 `python missing_modules.py -r /path/to/requirements.txt`
 
+- Combine multiple options
+`python missing_modules.py --clean-cache --uninstall-all --install`
+
 # Enable verbose logging
 python missing_modules.py -v
 2. **Output**:
