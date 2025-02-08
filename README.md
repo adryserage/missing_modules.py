@@ -35,7 +35,25 @@ This Python script automates the management of Python dependencies for a project
      ```bash
      python script_name.py
      ```
+Available options:
 
+- Scan a specific directory
+`python missing_modules.py -d /path/to/project`
+
+-  Install missing packages automatically
+`python missing_modules.py --install`
+
+-  Uninstall all non-standard library packages
+`python missing_modules.py --uninstall-all`
+
+-  Clean pip cache
+`python missing_modules.py --clean-cache`
+
+-  Specify custom requirements.txt location
+`python missing_modules.py -r /path/to/requirements.txt`
+
+# Enable verbose logging
+python missing_modules.py -v
 2. **Output**:
    - The script performs the following steps:
      - Lists all Python files in the directory and subdirectories.
