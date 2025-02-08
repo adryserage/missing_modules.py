@@ -46,24 +46,31 @@ class PackageManager:
 
     # Standard library packages that should not be included in requirements
     STDLIB_PACKAGES = {
-        # Core Python standard library
-        'os', 'sys', 'subprocess', 'logging', 'pathlib', 'typing',
-        'datetime', 'time', 'json', 're', 'math', 'random', 'collections',
-        'ssl', 'StringIO', 'io', 'unittest', 'tempfile', 'configparser',
-        'xml', 'html', 'http', 'urllib', 'socket', 'email', 'calendar',
-        'argparse', 'asyncio', 'concurrent', 'contextlib', 'csv', 'curses',
-        'dbm', 'decimal', 'difflib', 'distutils', 'enum', 'fileinput',
-        'fnmatch', 'fractions', 'ftplib', 'functools', 'glob', 'hashlib',
-        'heapq', 'hmac', 'imaplib', 'imp', 'inspect', 'itertools', 'keyword',
-        'linecache', 'locale', 'mimetypes', 'numbers', 'operator', 'optparse',
-        'pickle', 'pkgutil', 'platform', 'pprint', 'pwd', 'queue', 'Queue',
-        'shlex', 'shutil', 'signal', 'smtplib', 'statistics', 'string',
-        'struct', 'symbol', 'sysconfig', 'telnetlib', 'textwrap',
-        'threading', 'token', 'tokenize', 'traceback', 'types', 'uuid',
-        'warnings', 'weakref', 'zipfile', 'zlib', 'urllib2', 'urlparse',
-        'grp', '_typeshed', 'PIL', 'this', '_pyi_rth_utils', 'pyimod01_archive', 'yourapplication', 'otherfile',
-        'environment', 'successful', 'limited_api1', 'pkg1', 'it', 'an',
-        'ASCII', 'android'
+        # Core Python standard library modules
+        'abc', 'argparse', 'array', 'ast', 'asyncio', 'atexit', 'base64',
+        'binascii', 'builtins', 'bz2', 'calendar', 'cgi', 'chunk', 'cmd',
+        'code', 'codecs', 'collections', 'colorsys', 'configparser', 'contextlib',
+        'copy', 'copyreg', 'csv', 'datetime', 'decimal', 'difflib', 'dis',
+        'email', 'encodings', 'enum', 'errno', 'faulthandler', 'fcntl', 'filecmp',
+        'fileinput', 'fnmatch', 'fractions', 'ftplib', 'functools', 'gc',
+        'getopt', 'getpass', 'gettext', 'glob', 'graphlib', 'gzip', 'hashlib',
+        'heapq', 'hmac', 'html', 'http', 'imaplib', 'imghdr', 'importlib',
+        'inspect', 'io', 'ipaddress', 'itertools', 'json', 'keyword', 'linecache',
+        'locale', 'logging', 'lzma', 'mailbox', 'marshal', 'math', 'mimetypes',
+        'mmap', 'modulefinder', 'multiprocessing', 'netrc', 'numbers', 'operator',
+        'optparse', 'os', 'pathlib', 'pdb', 'pickle', 'pickletools', 'pipes',
+        'pkgutil', 'platform', 'plistlib', 'poplib', 'pprint', 'profile',
+        'pstats', 'pty', 'pwd', 'py_compile', 'pyclbr', 'pydoc', 'queue',
+        'quopri', 'random', 're', 'readline', 'reprlib', 'resource', 'rlcompleter',
+        'runpy', 'sched', 'secrets', 'select', 'selectors', 'shelve', 'shlex',
+        'shutil', 'signal', 'site', 'smtpd', 'smtplib', 'sndhdr', 'socket',
+        'socketserver', 'sqlite3', 'ssl', 'stat', 'statistics', 'string',
+        'stringprep', 'struct', 'subprocess', 'sys', 'sysconfig', 'tabnanny',
+        'tarfile', 'tempfile', 'termios', 'textwrap', 'threading', 'time',
+        'timeit', 'token', 'tokenize', 'trace', 'traceback', 'tracemalloc',
+        'types', 'typing', 'unicodedata', 'unittest', 'urllib', 'uuid', 'venv',
+        'warnings', 'wave', 'weakref', 'webbrowser', 'winreg', 'winsound',
+        'wsgiref', 'xml', 'xmlrpc', 'zipapp', 'zipfile', 'zipimport', 'zlib'
     }
 
     # Package name mappings for pip installation
@@ -103,29 +110,29 @@ class PackageManager:
     def find_python_files(self) -> List[Path]:
         """Find all Python files recursively."""
         logger.info("Scanning for Python files in %s", self.root_dir)
-        
+
         python_files = []
         total_dirs = 0
         processed_dirs = 0
-        
+
         # First count total directories for progress tracking
-        for _, dirs, _ in os.walk(self.root_dir):
+        for _, _, _ in os.walk(self.root_dir):
             total_dirs += 1
-            
+
         # Now scan for Python files with progress tracking
         for root, _, files in os.walk(self.root_dir):
             processed_dirs += 1
             progress = (processed_dirs / total_dirs) * 100
-            
+
             if processed_dirs % 100 == 0 or processed_dirs == total_dirs:  # Log every 100 directories
-                logger.info("Scanning progress: %.1f%% (%d/%d directories)", 
-                          progress, processed_dirs, total_dirs)
-                
+                logger.info("Scanning progress: %.1f%% (%d/%d directories)",
+                            progress, processed_dirs, total_dirs)
+
             python_files.extend([
                 Path(os.path.join(root, f))
                 for f in files if f.endswith(".py")
             ])
-            
+
         logger.info("Found %d Python files", len(python_files))
         return python_files
 
@@ -210,7 +217,8 @@ class PackageManager:
             result = subprocess.run(
                 ["pip", "index", "versions", install_name],
                 capture_output=True,
-                text=True
+                text=True,
+                check=False
             )
             info.is_available = result.returncode == 0 and "versions:" in result.stdout
         except Exception as e:
@@ -224,8 +232,8 @@ class PackageManager:
             return package_info
 
         try:
-            logger.info("Installing %s as %s...", 
-                       package_info.import_name, package_info.install_name)
+            logger.info("Installing %s as %s...",
+                        package_info.import_name, package_info.install_name)
             subprocess.check_call(
                 ["pip", "install", package_info.install_name],
                 stdout=subprocess.PIPE,
@@ -235,7 +243,8 @@ class PackageManager:
         except subprocess.CalledProcessError as e:
             package_info.install_status = False
             package_info.error_message = str(e)
-            logger.error("Failed to install %s: %s", package_info.install_name, e)
+            logger.error("Failed to install %s: %s",
+                         package_info.install_name, e)
 
         return package_info
 
@@ -244,7 +253,7 @@ class PackageManager:
         # Find all Python files
         python_files = self.find_python_files()
         total_files = len(python_files)
-        
+
         # Extract imports from all files
         all_imports = set()
         logger.info("Analyzing imports from Python files...")
@@ -252,23 +261,24 @@ class PackageManager:
             all_imports.update(self.extract_imports(file))
             if i % 100 == 0 or i == total_files:  # Log every 100 files or at the end
                 progress = (i / total_files) * 100
-                logger.info("Progress: %.1f%% (%d/%d files analyzed)", 
-                          progress, i, total_files)
-            
+                logger.info("Progress: %.1f%% (%d/%d files analyzed)",
+                            progress, i, total_files)
+
         logger.info("Found %d unique imported packages", len(all_imports))
-        logger.info("Searching for availability of %d packages...", len(all_imports))
-        
+        logger.info("Searching for availability of %d packages...",
+                    len(all_imports))
+
         # Verify packages in parallel
         completed = 0
         total_packages = len(all_imports)
         logger.info("Starting package verification...")
-        
+
         with ThreadPoolExecutor() as executor:
             future_to_package = {
                 executor.submit(self.verify_package, pkg): pkg
                 for pkg in all_imports
             }
-            
+
             for future in as_completed(future_to_package):
                 package = future_to_package[future]
                 try:
@@ -277,34 +287,34 @@ class PackageManager:
                     completed += 1
                     if completed % 10 == 0 or completed == total_packages:  # Log every 10 packages
                         progress = (completed / total_packages) * 100
-                        logger.info("Verification progress: %.1f%% (%d/%d packages)", 
-                                  progress, completed, total_packages)
+                        logger.info("Verification progress: %.1f%% (%d/%d packages)",
+                                    progress, completed, total_packages)
                 except Exception as e:
                     logger.error("Error verifying %s: %s", package, e)
-                    
+
         logger.info("Filtering packages that need installation...")
         # Filter packages that need installation
         to_install = [
             info for info in self.packages.values()
             if info.is_available and not info.is_stdlib and info.install_name
         ]
-        
+
         if not to_install:
             logger.info("No packages need to be installed")
             return True
-            
+
         logger.info("Installing %d packages...", len(to_install))
-        
+
         # Install packages in parallel
         completed = 0
         total_installs = len(to_install)
-        
+
         with ThreadPoolExecutor() as executor:
             future_to_info = {
                 executor.submit(self.install_package, info): info
                 for info in to_install
             }
-            
+
             for future in as_completed(future_to_info):
                 info = future_to_info[future]
                 try:
@@ -312,11 +322,12 @@ class PackageManager:
                     self.packages[info.import_name] = updated_info
                     completed += 1
                     progress = (completed / total_installs) * 100
-                    logger.info("Installation progress: %.1f%% (%d/%d packages)", 
-                              progress, completed, total_installs)
+                    logger.info("Installation progress: %.1f%% (%d/%d packages)",
+                                progress, completed, total_installs)
                 except Exception as e:
-                    logger.error("Error installing %s: %s", info.import_name, e)
-                    
+                    logger.error("Error installing %s: %s",
+                                 info.import_name, e)
+
         # Generate summary
         successful = [
             info.import_name for info in self.packages.values()
@@ -370,7 +381,8 @@ def main():
         manager.generate_requirements()
 
         if not success:
-            logger.warning("Some packages could not be installed - check the logs for details")
+            logger.warning(
+                "Some packages could not be installed - check the logs for details")
             sys.exit(1)
 
     except Exception as e:
