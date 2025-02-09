@@ -25,8 +25,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 # Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -310,11 +309,9 @@ class PackageManager:
             progress = (processed_dirs / total_dirs) * 100
 
             if processed_dirs % 100 == 0 or processed_dirs == total_dirs:
-                logger.info("Progress: %.1f%% (%d/%d dirs)",
-                            progress, processed_dirs, total_dirs)
+                logger.info("Progress: %.1f%% (%d/%d dirs)", progress, processed_dirs, total_dirs)
 
-            python_files.extend([Path(os.path.join(root, f))
-                                for f in files if f.endswith(".py")])
+            python_files.extend([Path(os.path.join(root, f)) for f in files if f.endswith(".py")])
 
         logger.info("Found %d Python files", len(python_files))
         return python_files
@@ -366,8 +363,7 @@ class PackageManager:
                             # Handle from ... import ...
                             parts = line.split()
                             if len(parts) >= 2:
-                                name = parts[1].split(".")[0].split("#")[
-                                    0].strip()
+                                name = parts[1].split(".")[0].split("#")[0].strip()
                                 if name and self.is_valid_package_name(name):
                                     imports.add(name)
         except Exception as e:
@@ -409,12 +405,10 @@ class PackageManager:
             all_imports.update(self.extract_imports(file))
             if i % 100 == 0 or i == total_files:  # Log every 100 files or at the end
                 progress = (i / total_files) * 100
-                logger.info("Progress: %.1f%% (%d/%d files analyzed)",
-                            progress, i, total_files)
+                logger.info("Progress: %.1f%% (%d/%d files analyzed)", progress, i, total_files)
 
         logger.info("Found %d unique imported packages", len(all_imports))
-        logger.info("Searching for availability of %d packages...",
-                    len(all_imports))
+        logger.info("Searching for availability of %d packages...", len(all_imports))
 
         # Verify packages in parallel using a smaller thread pool
         completed = 0
@@ -469,8 +463,7 @@ class PackageManager:
             results[install_name] = self.install_package(install_name)
 
         success, failed = self.get_operation_results(results)
-        logger.info(
-            "Installation complete: %d succeeded, %d failed", success, failed)
+        logger.info("Installation complete: %d succeeded, %d failed", success, failed)
         return results
 
     def process_packages(self) -> bool:
@@ -499,8 +492,7 @@ class PackageManager:
         Returns:
             Dict[str, bool]: A dictionary mapping package names to uninstallation success status
         """
-        logger.info(
-            "Starting uninstallation of all non-standard library packages...")
+        logger.info("Starting uninstallation of all non-standard library packages...")
         results = {}
 
         try:
@@ -521,8 +513,7 @@ class PackageManager:
                 try:
                     logger.info("Uninstalling package: %s", package_name)
                     subprocess.run(
-                        [sys.executable, "-m", "pip",
-                            "uninstall", "-y", package_name],
+                        [sys.executable, "-m", "pip", "uninstall", "-y", package_name],
                         capture_output=True,
                         check=True,
                     )
@@ -617,10 +608,8 @@ def interactive_mode(package_manager: "PackageManager"):
 
             elif choice == 2:  # Install Missing Packages
                 results = package_manager.install_missing_packages()
-                success, failed = package_manager.get_operation_results(
-                    results)
-                print(
-                    f"\nInstallation complete: {success} succeeded, {failed} failed")
+                success, failed = package_manager.get_operation_results(results)
+                print(f"\nInstallation complete: {success} succeeded, {failed} failed")
 
             elif choice == 3:  # Uninstall All
                 confirm = input(
@@ -628,10 +617,8 @@ def interactive_mode(package_manager: "PackageManager"):
                 )
                 if confirm.lower() == "y":
                     results = package_manager.uninstall_all_packages()
-                    success, failed = package_manager.get_operation_results(
-                        results)
-                    print(
-                        f"\nUninstallation complete: {success} succeeded, {failed} failed")
+                    success, failed = package_manager.get_operation_results(results)
+                    print(f"\nUninstallation complete: {success} succeeded, {failed} failed")
 
             elif choice == 4:  # Clean Cache
                 if package_manager.clean_package_cache():
@@ -643,8 +630,7 @@ def interactive_mode(package_manager: "PackageManager"):
                 req_file = input(
                     "\nEnter requirements file path (or press Enter for default): "
                 ).strip()
-                req_path = package_manager.get_requirements_path(
-                    req_file if req_file else None)
+                req_path = package_manager.get_requirements_path(req_file if req_file else None)
                 package_manager.generate_requirements(req_path)
                 print(f"\nRequirements file generated: {req_path}")
 
@@ -659,17 +645,13 @@ def interactive_mode(package_manager: "PackageManager"):
 
                 # Uninstall all packages
                 results = package_manager.uninstall_all_packages()
-                success, failed = package_manager.get_operation_results(
-                    results)
-                print(
-                    f"Uninstallation complete: {success} succeeded, {failed} failed")
+                success, failed = package_manager.get_operation_results(results)
+                print(f"Uninstallation complete: {success} succeeded, {failed} failed")
 
                 # Install missing packages
                 results = package_manager.install_missing_packages()
-                success, failed = package_manager.get_operation_results(
-                    results)
-                print(
-                    f"Installation complete: {success} succeeded, {failed} failed")
+                success, failed = package_manager.get_operation_results(results)
+                print(f"Installation complete: {success} succeeded, {failed} failed")
 
                 # Generate requirements.txt
                 req_path = package_manager.get_requirements_path()
@@ -713,12 +695,9 @@ def main():
         action="store_true",
         help="Uninstall all non-standard library packages",
     )
-    parser.add_argument("--clean-cache", "-c",
-                        action="store_true", help="Clean pip cache")
-    parser.add_argument("--verbose", "-v", action="store_true",
-                        help="Enable verbose logging")
-    parser.add_argument("--option", "-o", action="store_true",
-                        help="Run in interactive menu mode")
+    parser.add_argument("--clean-cache", "-c", action="store_true", help="Clean pip cache")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--option", "-o", action="store_true", help="Run in interactive menu mode")
 
     args = parser.parse_args()
 
@@ -737,13 +716,10 @@ def main():
         else:
             # Run in command-line mode
             if args.uninstall_all:
-                logger.info(
-                    "Uninstalling all non-standard library packages...")
+                logger.info("Uninstalling all non-standard library packages...")
                 results = package_manager.uninstall_all_packages()
-                success, failed = package_manager.get_operation_results(
-                    results)
-                logger.info(
-                    f"Uninstallation complete: {success} succeeded, {failed} failed")
+                success, failed = package_manager.get_operation_results(results)
+                logger.info(f"Uninstallation complete: {success} succeeded, {failed} failed")
 
             if args.clean_cache:
                 if package_manager.clean_package_cache():
@@ -759,8 +735,7 @@ def main():
                 if args.install:
                     results = package_manager.install_missing_packages()
                 else:
-                    logger.info(
-                        "Use --install option to install missing packages")
+                    logger.info("Use --install option to install missing packages")
             else:
                 logger.info("No missing packages found")
 
