@@ -1,11 +1,5 @@
 [MESSAGES CONTROL]
-disable=C0303,  # Trailing whitespace
-        C0301,  # Line too long
-        R0914,  # Too many local variables
-        R0912,  # Too many branches
-        W0718,# Catching too general exception Exception
-        W1203,
-        R0915
+disable=C0303,C0301,R0914,R0912,W0718,W1203,R0915
 
 [FORMAT]
 max-line-length=100
