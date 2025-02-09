@@ -733,7 +733,7 @@ def main():
             if missing_packages:
                 logger.info(f"Found {len(missing_packages)} missing packages")
                 if args.install:
-                    results = package_manager.install_missing_packages()
+                    package_manager.install_missing_packages()
                 else:
                     logger.info("Use --install option to install missing packages")
             else:
