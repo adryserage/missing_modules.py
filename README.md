@@ -4,6 +4,8 @@
 
 [![CodeQL Advanced - Python](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml)
 [![Pylint](https://github.com/adryserage/missing_modules.py/actions/workflows/pylint.yml/badge.svg)](https://github.com/adryserage/missing_modules.py/actions/workflows/pylint.yml)
+[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 
 ## Overview
 
@@ -37,6 +39,60 @@ A utility script to detect and install missing Python packages in a project. It 
   - Menu-driven interface for common operations
   - Progress reporting for long-running operations
   - Detailed logging with configurable verbosity
+
+## Code Quality Tools
+
+### Static Analysis and Formatting
+
+The project uses several tools to maintain code quality:
+
+- **Black** - The uncompromising code formatter
+  - Ensures consistent code style
+  - Line length set to 100 characters
+  - Configured in `pyproject.toml`
+
+- **isort** - Import sorting tool
+  - Automatically organizes imports
+  - Groups imports by type (stdlib, third-party, local)
+  - Configured to work with Black's style
+
+- **pylint** - Python static code analyzer
+  - Enforces coding standards
+  - Detects potential errors
+  - Custom configuration in `.pylintrc`
+
+### Code Quality Configuration
+
+The project includes several configuration files:
+
+- `pyproject.toml`: Configuration for Black and isort
+- `.pylintrc`: Pylint configuration with custom rules
+- `.github/workflows/pylint.yml`: CI pipeline for code quality checks
+
+### Running Code Quality Tools
+
+```bash
+# Format code with Black
+black .
+
+# Sort imports with isort
+isort .
+
+# Run pylint checks
+pylint $(git ls-files '*.py')
+```
+
+### Pre-commit Hooks
+
+It's recommended to set up pre-commit hooks to run these tools automatically before each commit:
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install the git hook scripts
+pre-commit install
+```
 
 ## Installation
 

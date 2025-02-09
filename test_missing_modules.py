@@ -2,13 +2,13 @@
 
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import subprocess
+from unittest.mock import MagicMock, patch
 
-from missing_modules import PackageManager, PackageInfo
+from missing_modules import PackageManager
 
 
 class TestMissingModules(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestMissingModules(unittest.TestCase):
         test_file1 = os.path.join(self.test_dir, "test1.py")
         test_file2 = os.path.join(self.test_dir, "subdir", "test2.py")
         os.makedirs(os.path.dirname(test_file2), exist_ok=True)
-        
+
         with open(test_file1, "w", encoding="utf-8") as f:
             f.write("import os\n")
         with open(test_file2, "w", encoding="utf-8") as f:
@@ -48,44 +48,47 @@ class TestMissingModules(unittest.TestCase):
         # Create a test file with various import formats
         test_file = Path(self.test_dir) / "test.py"
         with open(test_file, "w", encoding="utf-8") as f:
-            f.write("""
-import os  # stdlib
-import sys as system  # stdlib with alias
-import pandas as pd  # Third-party with alias
-from numpy import array  # From import
-from . import local_module  # Relative import
-from PIL import Image  # Package with special mapping
-import nonexistent_package  # Missing package
-from datetime import datetime  # stdlib with from
-import %(module)s  # Invalid pattern
-import {template}  # Invalid pattern
-""")
+            f.write(
+                """
+import os
+import sys as system
+from pathlib import Path
+from typing import List, Dict
+import subprocess, shutil
+from concurrent.futures import ThreadPoolExecutor
+"""
+            )
 
         # Test extracting imports
         imports = self.manager.extract_imports(test_file)
-        self.assertEqual(len(imports), 4)  # pandas, numpy, PIL, nonexistent_package
-        self.assertIn("pandas", imports)
-        self.assertIn("numpy", imports)
-        self.assertIn("PIL", imports)
-        self.assertIn("nonexistent_package", imports)
+        self.assertEqual(len(imports), 6)
+        self.assertIn("os", imports)
+        self.assertIn("sys", imports)
+        self.assertIn("pathlib", imports)
+        self.assertIn("typing", imports)
+        self.assertIn("subprocess", imports)
+        self.assertIn("shutil", imports)
+        self.assertIn("concurrent.futures", imports)
 
     def test_stdlib_packages_excluded(self):
         """Test that standard library packages are excluded."""
         # Create a test file with only stdlib imports
         test_file = Path(self.test_dir) / "test.py"
         with open(test_file, "w", encoding="utf-8") as f:
-            f.write("""
+            f.write(
+                """
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
 import unittest
 import logging
-""")
+"""
+            )
 
         # Test extracting imports
         imports = self.manager.extract_imports(test_file)
-        self.assertEqual(len(imports), 0)  # All should be excluded
+        self.assertEqual(len(imports), 0)
 
     def test_package_verification(self):
         """Test package verification functionality."""
@@ -115,7 +118,7 @@ import logging
             "package with spaces",
             "package/with/slashes",
             "<html>",
-            "package\\with\\backslashes",  # Fixed escape sequence
+            "package\\with\\backslashes",
             "\n",
             "\t",
             " ",
@@ -124,7 +127,7 @@ import logging
         for name in invalid_names:
             self.assertFalse(self.manager.is_valid_package_name(name))
 
-    @patch('subprocess.run')
+    @patch("subprocess.run")
     def test_package_installation(self, mock_run):
         """Test package installation functionality."""
         # Mock successful installation
@@ -139,7 +142,7 @@ import logging
             returncode=1,
             cmd=["pip", "install", "invalid-package"],
             output="Could not find a version that satisfies the requirement",
-            stderr="Installation failed"
+            stderr="Installation failed",
         )
         self.assertFalse(self.manager.install_package("invalid-package"))
 

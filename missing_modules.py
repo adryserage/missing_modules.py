@@ -13,27 +13,27 @@ Features:
 - Detailed logging and error reporting
 """
 
-import os
-import sys
-import logging
-import subprocess
 import argparse
-from typing import List, Set, Dict, Optional
-from pathlib import Path
-from dataclasses import dataclass
+import importlib.util
+import logging
+import os
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, List, Optional, Set
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO,
+                    format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class PackageInfo:
     """Information about a Python package."""
+
     import_name: str
     install_name: Optional[str] = None
     is_stdlib: bool = False
@@ -48,55 +48,190 @@ class PackageManager:
     # Standard library packages that should not be included in requirements
     STDLIB_PACKAGES = {
         # Core Python standard library modules
-        'abc', 'argparse', 'array', 'ast', 'asyncio', 'atexit', 'base64',
-        'binascii', 'builtins', 'bz2', 'calendar', 'cgi', 'chunk', 'cmd',
-        'code', 'codecs', 'collections', 'colorsys', 'configparser', 'contextlib',
-        'copy', 'copyreg', 'csv', 'datetime', 'decimal', 'difflib', 'dis',
-        'email', 'encodings', 'enum', 'errno', 'faulthandler', 'fcntl', 'filecmp',
-        'fileinput', 'fnmatch', 'fractions', 'ftplib', 'functools', 'gc',
-        'getopt', 'getpass', 'gettext', 'glob', 'graphlib', 'gzip', 'hashlib',
-        'heapq', 'hmac', 'html', 'http', 'imaplib', 'imghdr', 'importlib',
-        'inspect', 'io', 'ipaddress', 'itertools', 'json', 'keyword', 'linecache',
-        'locale', 'logging', 'lzma', 'mailbox', 'marshal', 'math', 'mimetypes',
-        'mmap', 'modulefinder', 'multiprocessing', 'netrc', 'numbers', 'operator',
-        'optparse', 'os', 'pathlib', 'pdb', 'pickle', 'pickletools', 'pipes',
-        'pkgutil', 'platform', 'plistlib', 'poplib', 'pprint', 'profile',
-        'pstats', 'pty', 'pwd', 'py_compile', 'pyclbr', 'pydoc', 'queue',
-        'quopri', 'random', 're', 'readline', 'reprlib', 'resource', 'rlcompleter',
-        'runpy', 'sched', 'secrets', 'select', 'selectors', 'shelve', 'shlex',
-        'shutil', 'signal', 'site', 'smtpd', 'smtplib', 'sndhdr', 'socket',
-        'socketserver', 'sqlite3', 'ssl', 'stat', 'statistics', 'string',
-        'stringprep', 'struct', 'subprocess', 'sys', 'sysconfig', 'tabnanny',
-        'tarfile', 'tempfile', 'termios', 'textwrap', 'threading', 'time',
-        'timeit', 'token', 'tokenize', 'trace', 'traceback', 'tracemalloc',
-        'types', 'typing', 'unicodedata', 'unittest', 'urllib', 'uuid', 'venv',
-        'warnings', 'wave', 'weakref', 'webbrowser', 'winreg', 'winsound',
-        'wsgiref', 'xml', 'xmlrpc', 'zipapp', 'zipfile', 'zipimport', 'zlib'
+        "abc",
+        "argparse",
+        "array",
+        "ast",
+        "asyncio",
+        "atexit",
+        "base64",
+        "binascii",
+        "builtins",
+        "bz2",
+        "calendar",
+        "cgi",
+        "chunk",
+        "cmd",
+        "code",
+        "codecs",
+        "collections",
+        "colorsys",
+        "configparser",
+        "contextlib",
+        "copy",
+        "copyreg",
+        "csv",
+        "datetime",
+        "decimal",
+        "difflib",
+        "dis",
+        "email",
+        "encodings",
+        "enum",
+        "errno",
+        "faulthandler",
+        "fcntl",
+        "filecmp",
+        "fileinput",
+        "fnmatch",
+        "fractions",
+        "ftplib",
+        "functools",
+        "gc",
+        "getopt",
+        "getpass",
+        "gettext",
+        "glob",
+        "graphlib",
+        "gzip",
+        "hashlib",
+        "heapq",
+        "hmac",
+        "html",
+        "http",
+        "imaplib",
+        "imghdr",
+        "importlib",
+        "inspect",
+        "io",
+        "ipaddress",
+        "itertools",
+        "json",
+        "keyword",
+        "linecache",
+        "locale",
+        "logging",
+        "lzma",
+        "mailbox",
+        "marshal",
+        "math",
+        "mimetypes",
+        "mmap",
+        "modulefinder",
+        "multiprocessing",
+        "netrc",
+        "numbers",
+        "operator",
+        "optparse",
+        "os",
+        "pathlib",
+        "pdb",
+        "pickle",
+        "pickletools",
+        "pipes",
+        "pkgutil",
+        "platform",
+        "plistlib",
+        "poplib",
+        "pprint",
+        "profile",
+        "pstats",
+        "pty",
+        "pwd",
+        "py_compile",
+        "pyclbr",
+        "pydoc",
+        "queue",
+        "quopri",
+        "random",
+        "re",
+        "readline",
+        "reprlib",
+        "resource",
+        "rlcompleter",
+        "runpy",
+        "sched",
+        "secrets",
+        "select",
+        "selectors",
+        "shelve",
+        "shlex",
+        "shutil",
+        "signal",
+        "site",
+        "smtpd",
+        "smtplib",
+        "sndhdr",
+        "socket",
+        "socketserver",
+        "sqlite3",
+        "ssl",
+        "stat",
+        "statistics",
+        "string",
+        "stringprep",
+        "struct",
+        "subprocess",
+        "sys",
+        "sysconfig",
+        "tabnanny",
+        "tarfile",
+        "tempfile",
+        "termios",
+        "textwrap",
+        "threading",
+        "time",
+        "timeit",
+        "token",
+        "tokenize",
+        "trace",
+        "traceback",
+        "tracemalloc",
+        "types",
+        "typing",
+        "unicodedata",
+        "unittest",
+        "urllib",
+        "uuid",
+        "venv",
+        "warnings",
+        "wave",
+        "weakref",
+        "webbrowser",
+        "winreg",
+        "winsound",
+        "wsgiref",
+        "xml",
+        "xmlrpc",
+        "zipapp",
+        "zipfile",
+        "zipimport",
+        "zlib",
     }
 
     # Package name mappings for pip installation
     PACKAGE_MAPPINGS = {
-        'PIL': 'Pillow',  # PIL should be installed as Pillow
-        'gi': 'PyGObject',  # gi module comes from PyGObject
+        "PIL": "Pillow",  # PIL should be installed as Pillow
+        "gi": "PyGObject",  # gi module comes from PyGObject
     }
 
     # Invalid package name patterns
     INVALID_PATTERNS = {
-        '%(module)s',  # Template strings
-        'lowest',      # Common false positives
-        '%',          # Template markers
-        '$',          # Variable markers
-        '{',          # Format strings
-        '}',
-        '<',          # HTML/XML tags
-        '>',
-        '\\',         # Path separators
-        '/',
-        '"',          # Quotes
+        "%(module)s",  # Template strings
+        "lowest",  # Common false positives
+        "%",  # Template markers
+        "$",  # Variable markers
+        "{",  # Format strings
+        "}",
+        "<",  # HTML/XML tags
+        ">",
+        "\\",  # Path separators
+        "/",
+        '"',  # Quotes
         "'",
-        ' ',          # Spaces
-        '\t',         # Tabs
-        '\n',         # Newlines
+        " ",  # Spaces
+        "\t",  # Tabs
+        "\n",  # Newlines
     }
 
     def __init__(self, root_dir: str):
@@ -145,23 +280,22 @@ class PackageManager:
             bool: True if installation succeeded, False otherwise
         """
         try:
-            logger.info(f"Installing package: {package_name}")
+            logger.info("Installing package: %s", package_name)
             process = subprocess.run(
                 [sys.executable, "-m", "pip", "install", package_name],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
-            logger.debug(f"Installation output: {process.stdout}")
+            logger.debug("Installation output: %s", process.stdout)
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to install {package_name}: {e.stderr}")
+            logger.error("Installation failed: %s", str(e))
             return False
 
     def find_python_files(self) -> List[Path]:
         """Find all Python files recursively."""
-        logger.info("Scanning for Python files in %s", self.root_dir)
-
+        logger.info("Scanning directory: %s", str(self.root_dir))
         python_files = []
         total_dirs = 0
         processed_dirs = 0
@@ -175,14 +309,12 @@ class PackageManager:
             processed_dirs += 1
             progress = (processed_dirs / total_dirs) * 100
 
-            if processed_dirs % 100 == 0 or processed_dirs == total_dirs:  # Log every 100 directories
-                logger.info("Scanning progress: %.1f%% (%d/%d directories)",
+            if processed_dirs % 100 == 0 or processed_dirs == total_dirs:
+                logger.info("Progress: %.1f%% (%d/%d dirs)",
                             progress, processed_dirs, total_dirs)
 
-            python_files.extend([
-                Path(os.path.join(root, f))
-                for f in files if f.endswith(".py")
-            ])
+            python_files.extend([Path(os.path.join(root, f))
+                                for f in files if f.endswith(".py")])
 
         logger.info("Found %d Python files", len(python_files))
         return python_files
@@ -200,10 +332,10 @@ class PackageManager:
         if not any(c.isalnum() for c in name):
             return False
 
-        if not (name[0].isalpha() or name[0] == '_'):
+        if not (name[0].isalpha() or name[0] == "_"):
             return False
 
-        if name.startswith('_'):
+        if name.startswith("_"):
             return False
 
         return True
@@ -247,24 +379,14 @@ class PackageManager:
         """Verify if a package is available and get its installation status."""
         info = PackageInfo(import_name=package_name)
 
-        # Check if it's a standard library package
-        if package_name.lower() in (p.lower() for p in self.STDLIB_PACKAGES):
-            info.is_stdlib = True
-            info.is_available = True
-            return info
-
-        # Get installation name from mapping if available
-        info.install_name = self.PACKAGE_MAPPINGS.get(package_name, package_name)
-
         try:
-            # Try importing the module without executing it
-            import importlib.util
             spec = importlib.util.find_spec(package_name)
             info.is_available = spec is not None
-        except (ImportError, AttributeError, ValueError):
+        except ImportError as e:
+            logger.debug("Import failed for %s: %s", package_name, str(e))
             info.is_available = False
-        except Exception as e:
-            logger.error(f"Error verifying {package_name}: {e}")
+        except (AttributeError, ValueError) as e:
+            logger.error("Error verifying %s: %s", package_name, str(e))
             info.error_message = str(e)
             info.is_available = False
 
@@ -303,8 +425,7 @@ class PackageManager:
         # Use a smaller number of workers to avoid overwhelming the system
         with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1)) as executor:
             future_to_package = {
-                executor.submit(self.verify_package, pkg): pkg
-                for pkg in all_imports
+                executor.submit(self.verify_package, pkg): pkg for pkg in all_imports
             }
 
             for future in as_completed(future_to_package):
@@ -316,8 +437,12 @@ class PackageManager:
                     completed += 1
                     if completed % 10 == 0 or completed == total_packages:  # Log every 10 packages
                         progress = (completed / total_packages) * 100
-                        logger.info("Verification progress: %.1f%% (%d/%d packages)",
-                                    progress, completed, total_packages)
+                        logger.info(
+                            "Verification progress: %.1f%% (%d/%d packages)",
+                            progress,
+                            completed,
+                            total_packages,
+                        )
                 except Exception as e:
                     logger.error("Error verifying %s: %s", package, e)
 
@@ -331,124 +456,42 @@ class PackageManager:
         """
         logger.info("Starting installation of missing packages...")
         results = {}
-        
+
         # First, detect missing packages
         missing_packages = self.detect_missing_packages()
-        
+
         # Install each missing package
         for package_info in missing_packages:
             if package_info.import_name.lower() == "new":  # Skip invalid package name
                 continue
-                
+
             install_name = package_info.install_name or package_info.import_name
             results[install_name] = self.install_package(install_name)
-                
+
         success, failed = self.get_operation_results(results)
-        logger.info(f"Installation complete: {success} succeeded, {failed} failed")
+        logger.info(
+            "Installation complete: %d succeeded, %d failed", success, failed)
         return results
 
     def process_packages(self) -> bool:
         """Process all packages: verify and install if needed."""
-        # Find all Python files
-        python_files = self.find_python_files()
-        total_files = len(python_files)
+        logger.info("Processing packages...")
+        results = {}
 
-        # Extract imports from all files
-        all_imports = set()
-        logger.info("Analyzing imports from Python files...")
-        for i, file in enumerate(python_files, 1):
-            all_imports.update(self.extract_imports(file))
-            if i % 100 == 0 or i == total_files:  # Log every 100 files or at the end
-                progress = (i / total_files) * 100
-                logger.info("Progress: %.1f%% (%d/%d files analyzed)",
-                            progress, i, total_files)
+        for package_name in self.packages:
+            logger.info("Processing: %s", package_name)
+            try:
+                package_info = self.verify_package(package_name)
+                if not package_info.is_available:
+                    install_name = package_info.install_name or package_name
+                    results[install_name] = self.install_package(install_name)
+            except Exception as e:
+                logger.error("Error processing %s: %s", package_name, str(e))
+                results[package_name] = False
 
-        logger.info("Found %d unique imported packages", len(all_imports))
-        logger.info("Searching for availability of %d packages...",
-                    len(all_imports))
-
-        # Verify packages in parallel
-        completed = 0
-        total_packages = len(all_imports)
-        logger.info("Starting package verification...")
-
-        with ThreadPoolExecutor() as executor:
-            future_to_package = {
-                executor.submit(self.verify_package, pkg): pkg
-                for pkg in all_imports
-            }
-
-            for future in as_completed(future_to_package):
-                package = future_to_package[future]
-                try:
-                    info = future.result()
-                    self.packages[package] = info
-                    completed += 1
-                    if completed % 10 == 0 or completed == total_packages:  # Log every 10 packages
-                        progress = (completed / total_packages) * 100
-                        logger.info("Verification progress: %.1f%% (%d/%d packages)",
-                                    progress, completed, total_packages)
-                except Exception as e:
-                    logger.error("Error verifying %s: %s", package, e)
-
-        logger.info("Filtering packages that need installation...")
-        # Filter packages that need installation
-        to_install = [
-            info for info in self.packages.values()
-            if info.is_available and not info.is_stdlib and info.install_name
-        ]
-
-        if not to_install:
-            logger.info("No packages need to be installed")
-            return True
-
-        logger.info("Installing %d packages...", len(to_install))
-
-        # Install packages in parallel
-        completed = 0
-        total_installs = len(to_install)
-
-        with ThreadPoolExecutor() as executor:
-            future_to_info = {
-                executor.submit(self.install_package, info.install_name): info
-                for info in to_install
-            }
-
-            for future in as_completed(future_to_info):
-                info = future_to_info[future]
-                try:
-                    updated_info = future.result()
-                    self.packages[info.import_name] = updated_info
-                    completed += 1
-                    progress = (completed / total_installs) * 100
-                    logger.info("Installation progress: %.1f%% (%d/%d packages)",
-                                progress, completed, total_installs)
-                except Exception as e:
-                    logger.error("Error installing %s: %s",
-                                 info.import_name, e)
-
-        # Generate summary
-        successful = [
-            info.import_name for info in self.packages.values()
-            if info.install_status is True
-        ]
-        failed = [
-            info.import_name for info in self.packages.values()
-            if info.install_status is False
-        ]
-        skipped = [
-            info.import_name for info in self.packages.values()
-            if info.is_stdlib or not info.is_available
-        ]
-
-        if successful:
-            logger.info("Successfully installed: %s", successful)
-        if failed:
-            logger.warning("Failed to install: %s", failed)
-        if skipped:
-            logger.info("Skipped (stdlib or unavailable): %s", skipped)
-
-        return not bool(failed)
+        success, failed = self.get_operation_results(results)
+        logger.info("Results: %d succeeded, %d failed", success, failed)
+        return all(results.values())
 
     def uninstall_all_packages(self) -> Dict[str, bool]:
         """Uninstall all non-standard library packages from the environment.
@@ -459,40 +502,37 @@ class PackageManager:
         logger.info(
             "Starting uninstallation of all non-standard library packages...")
         results = {}
-        
+
         try:
             # Get list of installed packages
             process = subprocess.run(
-                [sys.executable, "-m", "pip", "freeze"],
-                capture_output=True,
-                text=True,
-                check=True
+                [sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True, check=True
             )
-            installed_packages = process.stdout.strip().split('\n')
+            installed_packages = process.stdout.strip().split("\n")
 
             for package in installed_packages:
                 if not package:  # Skip empty lines
                     continue
 
-                package_name = package.split('==')[0]
+                package_name = package.split("==")[0]
                 if package_name.lower() in (p.lower() for p in self.STDLIB_PACKAGES):
                     continue  # Skip standard library packages
 
                 try:
-                    logger.info(f"Uninstalling package: {package_name}")
+                    logger.info("Uninstalling package: %s", package_name)
                     subprocess.run(
                         [sys.executable, "-m", "pip",
                             "uninstall", "-y", package_name],
                         capture_output=True,
-                        check=True
+                        check=True,
                     )
                     results[package_name] = True
                 except subprocess.CalledProcessError as e:
-                    logger.error(f"Failed to uninstall {package_name}: {e}")
+                    logger.error("Failed to uninstall %s: %s", package_name, e)
                     results[package_name] = False
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to get list of installed packages: {e}")
+            logger.error("Failed to get list of installed packages: %s", e)
 
         return results
 
@@ -506,14 +546,12 @@ class PackageManager:
         try:
             # Clean pip cache
             subprocess.run(
-                [sys.executable, "-m", "pip", "cache", "purge"],
-                capture_output=True,
-                check=True
+                [sys.executable, "-m", "pip", "cache", "purge"], capture_output=True, check=True
             )
             logger.info("Successfully cleaned pip cache")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to clean pip cache: {e}")
+            logger.error("Failed to clean pip cache: %s", e)
             return False
 
     def generate_requirements(self, requirements_file: str = "requirements.txt") -> None:
@@ -527,7 +565,7 @@ class PackageManager:
         if requirements:
             with open(requirements_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(sorted(requirements)))
-            logger.info(f"Generated requirements file: {requirements_file}")
+            logger.info("Generated requirements file: %s", requirements_file)
         else:
             logger.info("No requirements to write")
 
@@ -562,11 +600,11 @@ def display_menu() -> int:
             print("Please enter a valid number")
 
 
-def interactive_mode(package_manager: 'PackageManager'):
+def interactive_mode(package_manager: "PackageManager"):
     """Run the package manager in interactive mode with a menu."""
     while True:
         choice = display_menu()
-        
+
         try:
             if choice == 1:  # Detect Missing Packages
                 missing = package_manager.detect_missing_packages()
@@ -576,61 +614,74 @@ def interactive_mode(package_manager: 'PackageManager'):
                         print(f"  - {pkg.import_name}")
                 else:
                     print("\nNo missing packages found!")
-                
+
             elif choice == 2:  # Install Missing Packages
                 results = package_manager.install_missing_packages()
-                success, failed = package_manager.get_operation_results(results)
-                print(f"\nInstallation complete: {success} succeeded, {failed} failed")
-                
+                success, failed = package_manager.get_operation_results(
+                    results)
+                print(
+                    f"\nInstallation complete: {success} succeeded, {failed} failed")
+
             elif choice == 3:  # Uninstall All
-                confirm = input("\nThis will uninstall all non-standard packages. Continue? (y/N): ")
-                if confirm.lower() == 'y':
+                confirm = input(
+                    "\nThis will uninstall all non-standard packages. Continue? (y/N): "
+                )
+                if confirm.lower() == "y":
                     results = package_manager.uninstall_all_packages()
-                    success, failed = package_manager.get_operation_results(results)
-                    print(f"\nUninstallation complete: {success} succeeded, {failed} failed")
-                
+                    success, failed = package_manager.get_operation_results(
+                        results)
+                    print(
+                        f"\nUninstallation complete: {success} succeeded, {failed} failed")
+
             elif choice == 4:  # Clean Cache
                 if package_manager.clean_package_cache():
                     print("\nSuccessfully cleaned pip cache")
                 else:
                     print("\nFailed to clean pip cache")
-                
+
             elif choice == 5:  # Generate Requirements
-                req_file = input("\nEnter requirements file path (or press Enter for default): ").strip()
-                req_path = package_manager.get_requirements_path(req_file if req_file else None)
+                req_file = input(
+                    "\nEnter requirements file path (or press Enter for default): "
+                ).strip()
+                req_path = package_manager.get_requirements_path(
+                    req_file if req_file else None)
                 package_manager.generate_requirements(req_path)
                 print(f"\nRequirements file generated: {req_path}")
-                
+
             elif choice == 6:  # Full Setup
                 print("\nStarting full setup...")
-                
+
                 # Clean cache first
                 if package_manager.clean_package_cache():
                     print("Successfully cleaned pip cache")
                 else:
                     print("Failed to clean pip cache")
-                
+
                 # Uninstall all packages
                 results = package_manager.uninstall_all_packages()
-                success, failed = package_manager.get_operation_results(results)
-                print(f"Uninstallation complete: {success} succeeded, {failed} failed")
-                
+                success, failed = package_manager.get_operation_results(
+                    results)
+                print(
+                    f"Uninstallation complete: {success} succeeded, {failed} failed")
+
                 # Install missing packages
                 results = package_manager.install_missing_packages()
-                success, failed = package_manager.get_operation_results(results)
-                print(f"Installation complete: {success} succeeded, {failed} failed")
-                
+                success, failed = package_manager.get_operation_results(
+                    results)
+                print(
+                    f"Installation complete: {success} succeeded, {failed} failed")
+
                 # Generate requirements.txt
                 req_path = package_manager.get_requirements_path()
                 package_manager.generate_requirements(req_path)
                 print(f"Requirements file generated: {req_path}")
-                
+
             elif choice == 7:  # Exit
                 print("\nGoodbye!")
                 break
-                
+
             input("\nPress Enter to continue...")
-            
+
         except Exception as e:
             logger.error(f"An error occurred: {e}")
             print(f"\nAn error occurred: {e}")
@@ -643,39 +694,31 @@ def main():
         description="Python package management utility for detecting and managing project dependencies."
     )
     parser.add_argument(
-        "--directory", "-d",
+        "--directory",
+        "-d",
         default=".",
-        help="Root directory to scan for Python files (default: current directory)"
+        help="Root directory to scan for Python files (default: current directory)",
     )
     parser.add_argument(
-        "--requirements", "-r",
-        help="Path to requirements.txt file (default: requirements.txt in root directory)"
+        "--requirements",
+        "-r",
+        help="Path to requirements.txt file (default: requirements.txt in root directory)",
     )
     parser.add_argument(
-        "--install", "-i",
+        "--install", "-i", action="store_true", help="Install missing packages automatically"
+    )
+    parser.add_argument(
+        "--uninstall-all",
+        "-u",
         action="store_true",
-        help="Install missing packages automatically"
+        help="Uninstall all non-standard library packages",
     )
-    parser.add_argument(
-        "--uninstall-all", "-u",
-        action="store_true",
-        help="Uninstall all non-standard library packages"
-    )
-    parser.add_argument(
-        "--clean-cache", "-c",
-        action="store_true",
-        help="Clean pip cache"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose logging"
-    )
-    parser.add_argument(
-        "--option", "-o",
-        action="store_true",
-        help="Run in interactive menu mode"
-    )
+    parser.add_argument("--clean-cache", "-c",
+                        action="store_true", help="Clean pip cache")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Enable verbose logging")
+    parser.add_argument("--option", "-o", action="store_true",
+                        help="Run in interactive menu mode")
 
     args = parser.parse_args()
 
@@ -694,10 +737,13 @@ def main():
         else:
             # Run in command-line mode
             if args.uninstall_all:
-                logger.info("Uninstalling all non-standard library packages...")
+                logger.info(
+                    "Uninstalling all non-standard library packages...")
                 results = package_manager.uninstall_all_packages()
-                success, failed = package_manager.get_operation_results(results)
-                logger.info(f"Uninstallation complete: {success} succeeded, {failed} failed")
+                success, failed = package_manager.get_operation_results(
+                    results)
+                logger.info(
+                    f"Uninstallation complete: {success} succeeded, {failed} failed")
 
             if args.clean_cache:
                 if package_manager.clean_package_cache():
@@ -713,7 +759,8 @@ def main():
                 if args.install:
                     results = package_manager.install_missing_packages()
                 else:
-                    logger.info("Use --install option to install missing packages")
+                    logger.info(
+                        "Use --install option to install missing packages")
             else:
                 logger.info("No missing packages found")
 

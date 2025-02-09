@@ -1,0 +1,22 @@
+[MESSAGES CONTROL]
+disable=C0303,  # Trailing whitespace
+        C0301,  # Line too long
+        R0914,  # Too many local variables
+        R0912,  # Too many branches
+        W0718   # Catching too general exception Exception
+
+[FORMAT]
+max-line-length=100
+
+[BASIC]
+good-names=i,j,k,ex,Run,_,fd,fp
+
+[DESIGN]
+max-locals=20
+max-branches=20
+
+[LOGGING]
+logging-format-style=old
+
+[MISCELLANEOUS]
+notes=FIXME,XXX,TODO
