@@ -108,6 +108,56 @@ class PackageManager:
         self.root_dir = Path(root_dir)
         self.packages: Dict[str, PackageInfo] = {}
 
+    @staticmethod
+    def get_operation_results(results: Dict[str, bool]) -> tuple[int, int]:
+        """Get success and failure counts from operation results.
+
+        Args:
+            results: Dictionary mapping names to success status
+
+        Returns:
+            tuple[int, int]: (success_count, failure_count)
+        """
+        success = sum(1 for v in results.values() if v)
+        failed = sum(1 for v in results.values() if not v)
+        return success, failed
+
+    def get_requirements_path(self, custom_path: Optional[str] = None) -> str:
+        """Get the path to requirements.txt file.
+
+        Args:
+            custom_path: Optional custom path for requirements.txt
+
+        Returns:
+            str: Full path to requirements.txt
+        """
+        if custom_path:
+            return os.path.abspath(custom_path)
+        return os.path.join(self.root_dir, "requirements.txt")
+
+    def install_package(self, package_name: str) -> bool:
+        """Install a single package using pip.
+
+        Args:
+            package_name: Name of the package to install
+
+        Returns:
+            bool: True if installation succeeded, False otherwise
+        """
+        try:
+            logger.info(f"Installing package: {package_name}")
+            process = subprocess.run(
+                [sys.executable, "-m", "pip", "install", package_name],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.debug(f"Installation output: {process.stdout}")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to install {package_name}: {e.stderr}")
+            return False
+
     def find_python_files(self) -> List[Path]:
         """Find all Python files recursively."""
         logger.info("Scanning for Python files in %s", self.root_dir)
@@ -194,60 +244,108 @@ class PackageManager:
         return imports
 
     def verify_package(self, package_name: str) -> PackageInfo:
-        """Verify package availability and status."""
+        """Verify if a package is available and get its installation status."""
         info = PackageInfo(import_name=package_name)
 
-        # Check if it's a stdlib package
-        if package_name in self.STDLIB_PACKAGES:
+        # Check if it's a standard library package
+        if package_name.lower() in (p.lower() for p in self.STDLIB_PACKAGES):
             info.is_stdlib = True
-            return info
-
-        # Try importing the package
-        try:
-            __import__(package_name)
             info.is_available = True
             return info
-        except ImportError:
-            pass
 
-        # Check if package exists on PyPI
-        install_name = self.get_install_name(package_name)
-        info.install_name = install_name
+        # Get installation name from mapping if available
+        info.install_name = self.PACKAGE_MAPPINGS.get(package_name, package_name)
 
         try:
-            result = subprocess.run(
-                ["pip", "index", "versions", install_name],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            info.is_available = result.returncode == 0 and "versions:" in result.stdout
+            # Try importing the module without executing it
+            import importlib.util
+            spec = importlib.util.find_spec(package_name)
+            info.is_available = spec is not None
+        except (ImportError, AttributeError, ValueError):
+            info.is_available = False
         except Exception as e:
+            logger.error(f"Error verifying {package_name}: {e}")
             info.error_message = str(e)
+            info.is_available = False
 
         return info
 
-    def install_package(self, package_info: PackageInfo) -> PackageInfo:
-        """Install a single package."""
-        if not package_info.is_available or not package_info.install_name:
-            return package_info
+    def detect_missing_packages(self) -> List[PackageInfo]:
+        """Detect missing packages in the project.
 
-        try:
-            logger.info("Installing %s as %s...",
-                        package_info.import_name, package_info.install_name)
-            subprocess.check_call(
-                ["pip", "install", package_info.install_name],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            package_info.install_status = True
-        except subprocess.CalledProcessError as e:
-            package_info.install_status = False
-            package_info.error_message = str(e)
-            logger.error("Failed to install %s: %s",
-                         package_info.install_name, e)
+        Returns:
+            List[PackageInfo]: A list of missing package information
+        """
+        # Find all Python files
+        python_files = self.find_python_files()
+        total_files = len(python_files)
 
-        return package_info
+        # Extract imports from all files
+        all_imports = set()
+        logger.info("Analyzing imports from Python files...")
+        for i, file in enumerate(python_files, 1):
+            all_imports.update(self.extract_imports(file))
+            if i % 100 == 0 or i == total_files:  # Log every 100 files or at the end
+                progress = (i / total_files) * 100
+                logger.info("Progress: %.1f%% (%d/%d files analyzed)",
+                            progress, i, total_files)
+
+        logger.info("Found %d unique imported packages", len(all_imports))
+        logger.info("Searching for availability of %d packages...",
+                    len(all_imports))
+
+        # Verify packages in parallel using a smaller thread pool
+        completed = 0
+        total_packages = len(all_imports)
+        logger.info("Starting package verification...")
+
+        missing_packages = []
+        # Use a smaller number of workers to avoid overwhelming the system
+        with ThreadPoolExecutor(max_workers=min(32, os.cpu_count() or 1)) as executor:
+            future_to_package = {
+                executor.submit(self.verify_package, pkg): pkg
+                for pkg in all_imports
+            }
+
+            for future in as_completed(future_to_package):
+                package = future_to_package[future]
+                try:
+                    info = future.result()
+                    if not info.is_available and not info.is_stdlib:
+                        missing_packages.append(info)
+                    completed += 1
+                    if completed % 10 == 0 or completed == total_packages:  # Log every 10 packages
+                        progress = (completed / total_packages) * 100
+                        logger.info("Verification progress: %.1f%% (%d/%d packages)",
+                                    progress, completed, total_packages)
+                except Exception as e:
+                    logger.error("Error verifying %s: %s", package, e)
+
+        return missing_packages
+
+    def install_missing_packages(self) -> Dict[str, bool]:
+        """Install all missing packages detected in the project.
+
+        Returns:
+            Dict[str, bool]: A dictionary mapping package names to installation success status
+        """
+        logger.info("Starting installation of missing packages...")
+        results = {}
+        
+        # First, detect missing packages
+        missing_packages = self.detect_missing_packages()
+        
+        # Install each missing package
+        for package_info in missing_packages:
+            if package_info.import_name.lower() == "new":  # Skip invalid package name
+                continue
+                
+            install_name = package_info.install_name or package_info.import_name
+            results[install_name] = self.install_package(install_name)
+                
+        success, failed = self.get_operation_results(results)
+        logger.info(f"Installation complete: {success} succeeded, {failed} failed")
+        return results
 
     def process_packages(self) -> bool:
         """Process all packages: verify and install if needed."""
@@ -312,7 +410,7 @@ class PackageManager:
 
         with ThreadPoolExecutor() as executor:
             future_to_info = {
-                executor.submit(self.install_package, info): info
+                executor.submit(self.install_package, info.install_name): info
                 for info in to_install
             }
 
@@ -352,21 +450,6 @@ class PackageManager:
 
         return not bool(failed)
 
-    def generate_requirements(self, requirements_file: str = "requirements.txt") -> None:
-        """Generate requirements.txt file."""
-        requirements = [
-            info.install_name
-            for info in self.packages.values()
-            if info.is_available and not info.is_stdlib and info.install_name
-        ]
-
-        if requirements:
-            with open(requirements_file, "w", encoding="utf-8") as f:
-                f.write("\n".join(sorted(requirements)))
-            logger.info(f"Generated requirements file: {requirements_file}")
-        else:
-            logger.info("No requirements to write")
-
     def uninstall_all_packages(self) -> Dict[str, bool]:
         """Uninstall all non-standard library packages from the environment.
 
@@ -376,7 +459,7 @@ class PackageManager:
         logger.info(
             "Starting uninstallation of all non-standard library packages...")
         results = {}
-
+        
         try:
             # Get list of installed packages
             process = subprocess.run(
@@ -413,35 +496,6 @@ class PackageManager:
 
         return results
 
-    def install_missing_packages(self) -> Dict[str, bool]:
-        """Install all missing packages detected in the project.
-
-        Returns:
-            Dict[str, bool]: A dictionary mapping package names to installation success status
-        """
-        logger.info("Starting installation of missing packages...")
-        results = {}
-
-        # First, detect missing packages
-        missing_packages = self.detect_missing_packages()
-
-        # Install each missing package
-        for package_info in missing_packages:
-            install_name = package_info.install_name or package_info.import_name
-            try:
-                logger.info(f"Installing package: {install_name}")
-                subprocess.run(
-                    [sys.executable, "-m", "pip", "install", install_name],
-                    capture_output=True,
-                    check=True
-                )
-                results[install_name] = True
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Failed to install {install_name}: {e}")
-                results[install_name] = False
-
-        return results
-
     def clean_package_cache(self) -> bool:
         """Clean pip cache to free up disk space.
 
@@ -462,63 +516,129 @@ class PackageManager:
             logger.error(f"Failed to clean pip cache: {e}")
             return False
 
-    def detect_missing_packages(self) -> List[PackageInfo]:
-        """Detect missing packages in the project.
+    def generate_requirements(self, requirements_file: str = "requirements.txt") -> None:
+        """Generate requirements.txt file."""
+        requirements = [
+            info.install_name
+            for info in self.packages.values()
+            if info.is_available and not info.is_stdlib and info.install_name
+        ]
 
-        Returns:
-            List[PackageInfo]: A list of missing package information
-        """
-        # Find all Python files
-        python_files = self.find_python_files()
-        total_files = len(python_files)
+        if requirements:
+            with open(requirements_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(sorted(requirements)))
+            logger.info(f"Generated requirements file: {requirements_file}")
+        else:
+            logger.info("No requirements to write")
 
-        # Extract imports from all files
-        all_imports = set()
-        logger.info("Analyzing imports from Python files...")
-        for i, file in enumerate(python_files, 1):
-            all_imports.update(self.extract_imports(file))
-            if i % 100 == 0 or i == total_files:  # Log every 100 files or at the end
-                progress = (i / total_files) * 100
-                logger.info("Progress: %.1f%% (%d/%d files analyzed)",
-                            progress, i, total_files)
 
-        logger.info("Found %d unique imported packages", len(all_imports))
-        logger.info("Searching for availability of %d packages...",
-                    len(all_imports))
+def display_menu() -> int:
+    """Display the interactive menu and get user choice.
 
-        # Verify packages in parallel
-        completed = 0
-        total_packages = len(all_imports)
-        logger.info("Starting package verification...")
+    Returns:
+        int: The user's menu choice
+    """
+    menu = """
+╔════════════════════════════════════════════╗
+║           Package Manager Menu              ║
+╠════════════════════════════════════════════╣
+║ 1. Detect Missing Packages                 ║
+║ 2. Install Missing Packages                ║
+║ 3. Uninstall All Non-Standard Packages     ║
+║ 4. Clean Package Cache                     ║
+║ 5. Generate Requirements File              ║
+║ 6. Full Setup (Clean + Install Missing)    ║
+║ 7. Exit                                    ║
+╚════════════════════════════════════════════╝
+"""
+    while True:
+        print(menu)
+        try:
+            choice = int(input("Enter your choice (1-7): "))
+            if 1 <= choice <= 7:
+                return choice
+            print("Please enter a number between 1 and 7")
+        except ValueError:
+            print("Please enter a valid number")
 
-        missing_packages = []
-        with ThreadPoolExecutor() as executor:
-            future_to_package = {
-                executor.submit(self.verify_package, pkg): pkg
-                for pkg in all_imports
-            }
 
-            for future in as_completed(future_to_package):
-                package = future_to_package[future]
-                try:
-                    info = future.result()
-                    if not info.is_available:
-                        missing_packages.append(info)
-                    completed += 1
-                    if completed % 10 == 0 or completed == total_packages:  # Log every 10 packages
-                        progress = (completed / total_packages) * 100
-                        logger.info("Verification progress: %.1f%% (%d/%d packages)",
-                                    progress, completed, total_packages)
-                except Exception as e:
-                    logger.error("Error verifying %s: %s", package, e)
-
-        return missing_packages
+def interactive_mode(package_manager: 'PackageManager'):
+    """Run the package manager in interactive mode with a menu."""
+    while True:
+        choice = display_menu()
+        
+        try:
+            if choice == 1:  # Detect Missing Packages
+                missing = package_manager.detect_missing_packages()
+                if missing:
+                    print("\nMissing packages:")
+                    for pkg in missing:
+                        print(f"  - {pkg.import_name}")
+                else:
+                    print("\nNo missing packages found!")
+                
+            elif choice == 2:  # Install Missing Packages
+                results = package_manager.install_missing_packages()
+                success, failed = package_manager.get_operation_results(results)
+                print(f"\nInstallation complete: {success} succeeded, {failed} failed")
+                
+            elif choice == 3:  # Uninstall All
+                confirm = input("\nThis will uninstall all non-standard packages. Continue? (y/N): ")
+                if confirm.lower() == 'y':
+                    results = package_manager.uninstall_all_packages()
+                    success, failed = package_manager.get_operation_results(results)
+                    print(f"\nUninstallation complete: {success} succeeded, {failed} failed")
+                
+            elif choice == 4:  # Clean Cache
+                if package_manager.clean_package_cache():
+                    print("\nSuccessfully cleaned pip cache")
+                else:
+                    print("\nFailed to clean pip cache")
+                
+            elif choice == 5:  # Generate Requirements
+                req_file = input("\nEnter requirements file path (or press Enter for default): ").strip()
+                req_path = package_manager.get_requirements_path(req_file if req_file else None)
+                package_manager.generate_requirements(req_path)
+                print(f"\nRequirements file generated: {req_path}")
+                
+            elif choice == 6:  # Full Setup
+                print("\nStarting full setup...")
+                
+                # Clean cache first
+                if package_manager.clean_package_cache():
+                    print("Successfully cleaned pip cache")
+                else:
+                    print("Failed to clean pip cache")
+                
+                # Uninstall all packages
+                results = package_manager.uninstall_all_packages()
+                success, failed = package_manager.get_operation_results(results)
+                print(f"Uninstallation complete: {success} succeeded, {failed} failed")
+                
+                # Install missing packages
+                results = package_manager.install_missing_packages()
+                success, failed = package_manager.get_operation_results(results)
+                print(f"Installation complete: {success} succeeded, {failed} failed")
+                
+                # Generate requirements.txt
+                req_path = package_manager.get_requirements_path()
+                package_manager.generate_requirements(req_path)
+                print(f"Requirements file generated: {req_path}")
+                
+            elif choice == 7:  # Exit
+                print("\nGoodbye!")
+                break
+                
+            input("\nPress Enter to continue...")
+            
+        except Exception as e:
+            logger.error(f"An error occurred: {e}")
+            print(f"\nAn error occurred: {e}")
+            input("\nPress Enter to continue...")
 
 
 def main():
     """Main entry point for the script."""
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Python package management utility for detecting and managing project dependencies."
     )
@@ -551,6 +671,11 @@ def main():
         action="store_true",
         help="Enable verbose logging"
     )
+    parser.add_argument(
+        "--option", "-o",
+        action="store_true",
+        help="Run in interactive menu mode"
+    )
 
     args = parser.parse_args()
 
@@ -563,42 +688,39 @@ def main():
     package_manager = PackageManager(root_dir)
 
     try:
-        if args.uninstall_all:
-            logger.info("Uninstalling all non-standard library packages...")
-            results = package_manager.uninstall_all_packages()
-            success = sum(1 for v in results.values() if v)
-            failed = sum(1 for v in results.values() if not v)
-            logger.info(
-                f"Uninstallation complete: {success} succeeded, {failed} failed")
-
-        if args.clean_cache:
-            if package_manager.clean_package_cache():
-                logger.info("Successfully cleaned pip cache")
-            else:
-                logger.error("Failed to clean pip cache")
-
-        # Always detect missing packages
-        missing_packages = package_manager.detect_missing_packages()
-
-        if missing_packages:
-            logger.info(f"Found {len(missing_packages)} missing packages")
-            if args.install:
-                logger.info("Installing missing packages...")
-                results = package_manager.install_missing_packages()
-                success = sum(1 for v in results.values() if v)
-                failed = sum(1 for v in results.values() if not v)
-                logger.info(
-                    f"Installation complete: {success} succeeded, {failed} failed")
-            else:
-                logger.info("Use --install option to install missing packages")
+        if args.option:
+            # Run in interactive mode
+            interactive_mode(package_manager)
         else:
-            logger.info("No missing packages found")
+            # Run in command-line mode
+            if args.uninstall_all:
+                logger.info("Uninstalling all non-standard library packages...")
+                results = package_manager.uninstall_all_packages()
+                success, failed = package_manager.get_operation_results(results)
+                logger.info(f"Uninstallation complete: {success} succeeded, {failed} failed")
 
-        # Generate requirements.txt
-        requirements_file = args.requirements or os.path.join(
-            root_dir, "requirements.txt")
-        package_manager.generate_requirements(requirements_file)
-        logger.info(f"Requirements file generated: {requirements_file}")
+            if args.clean_cache:
+                if package_manager.clean_package_cache():
+                    logger.info("Successfully cleaned pip cache")
+                else:
+                    logger.error("Failed to clean pip cache")
+
+            # Always detect missing packages
+            missing_packages = package_manager.detect_missing_packages()
+
+            if missing_packages:
+                logger.info(f"Found {len(missing_packages)} missing packages")
+                if args.install:
+                    results = package_manager.install_missing_packages()
+                else:
+                    logger.info("Use --install option to install missing packages")
+            else:
+                logger.info("No missing packages found")
+
+            # Generate requirements.txt
+            req_path = package_manager.get_requirements_path(args.requirements)
+            package_manager.generate_requirements(req_path)
+            logger.info(f"Requirements file generated: {req_path}")
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")

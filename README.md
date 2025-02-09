@@ -1,92 +1,168 @@
+# Missing Modules
+
 > Created by [Adryan Serage](https://github.com/adryserage)
 
 [![CodeQL Advanced - Python](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml/badge.svg)](https://github.com/Adryan-Serage/missing_modules.py/actions/workflows/codeql.yml)
 [![Pylint](https://github.com/adryserage/missing_modules.py/actions/workflows/pylint.yml/badge.svg)](https://github.com/adryserage/missing_modules.py/actions/workflows/pylint.yml)
 
-## Context
-A utility script to detect and install missing Python packages in a project.
-
-This module scans through Python files in a directory, identifies imported packages,
-checks which ones are missing from the current environment, generates a requirements.txt file,
-and optionally installs the missing packages using pip.
-
 ## Overview
-This Python script automates the management of Python dependencies for a project by:
-1. Recursively scanning all Python files in the project directory.
-2. Extracting all imported packages.
-3. Checking for missing packages that are not installed in the current environment.
-4. Generating a `requirements.txt` file with all detected packages.
-5. Installing any missing packages using `pip`.
+
+A utility script to detect and install missing Python packages in a project. It scans through Python files in a directory, identifies imported packages, checks which ones are missing from the current environment, generates a requirements.txt file, and optionally installs the missing packages using pip.
 
 ## Features
-- **Recursive File Scanning**: Automatically identifies all Python files in the specified project directory.
-- **Dependency Detection**: Extracts imported packages from the identified Python files.
-- **Requirements File Generation**: Creates or updates a `requirements.txt` file listing all detected dependencies.
-- **Package Installation**: Installs any missing dependencies using `pip`.
 
-## Prerequisites
-- Python 3.x installed on your system.
-- `pip` installed for package management.
+- **Smart Package Detection**
+  - Handles various import formats (e.g., `import x`, `from x import y`, `import x as y`)
+  - Excludes standard library packages automatically
+  - Handles special package mappings (e.g., `PIL` → `Pillow`)
+  - Filters out invalid package names and common false positives
 
-## How to Use
-1. **Run the Script**:
-   - Save the script in the root directory of your project.
-   - Execute the script:
-     ```bash
-     python script_name.py
-     ```
-Available options:
+- **Parallel Processing**
+  - Uses ThreadPoolExecutor for parallel package verification
+  - Optimized thread pool size to prevent system overload
+  - Progress tracking for file scanning and package verification
 
-- Scan a specific directory
-`python missing_modules.py -d /path/to/project`
+- **Comprehensive Package Management**
+  - Verifies package availability without executing code
+  - Installs missing packages using pip
+  - Generates requirements.txt file
+  - Supports package uninstallation and cache cleaning
 
--  Install missing packages automatically
-`python missing_modules.py --install`
+- **Robust Error Handling**
+  - Graceful handling of file encoding issues
+  - Detailed error reporting for package verification failures
+  - Proper cleanup of temporary resources
 
--  Uninstall all non-standard library packages
-`python missing_modules.py --uninstall-all`
+- **Interactive Mode**
+  - Menu-driven interface for common operations
+  - Progress reporting for long-running operations
+  - Detailed logging with configurable verbosity
 
--  Clean pip cache
-`python missing_modules.py --clean-cache`
+## Installation
 
--  Specify custom requirements.txt location
-`python missing_modules.py -r /path/to/requirements.txt`
+```bash
+# Clone the repository
+git clone https://github.com/adryserage/missing_modules.py.git
 
-- Combine multiple options
-`python missing_modules.py --clean-cache --uninstall-all --install`
+# Navigate to the directory
+cd missing_modules.py
+
+# Optional: Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+## Usage
+
+### Command Line Interface
+
+```bash
+# Basic usage - scan current directory
+python missing_modules.py
+
+# Scan a specific directory
+python missing_modules.py -d /path/to/project
+
+# Install missing packages automatically
+python missing_modules.py --install
+
+# Generate requirements.txt in a custom location
+python missing_modules.py -r /path/to/requirements.txt
+
+# Uninstall all non-standard library packages
+python missing_modules.py --uninstall-all
+
+# Clean pip cache
+python missing_modules.py --clean-cache
 
 # Enable verbose logging
 python missing_modules.py -v
-2. **Output**:
-   - The script performs the following steps:
-     - Lists all Python files in the directory and subdirectories.
-     - Extracts a list of all imported packages.
-     - Writes the packages into a `requirements.txt` file.
-     - Checks for missing packages and installs them if necessary.
 
-## Example Workflow
-- **Step 1**: You run the script in your project directory.
-  - Example: Your project contains `app.py` and `utils/helpers.py`.
-- **Step 2**: The script scans all `.py` files and detects imports such as `numpy`, `pandas`, etc.
-- **Step 3**: It checks if these packages are installed in your environment.
-- **Step 4**: If any package is missing, it installs them using `pip`.
-- **Step 5**: A `requirements.txt` file is generated, containing:
-  ```
-  numpy
-  pandas
-  ```
+# Combine multiple options
+python missing_modules.py --clean-cache --uninstall-all --install
+```
 
-## Generated Files
-- `requirements.txt`: A text file listing all detected dependencies, suitable for use with `pip install -r requirements.txt`.
+### Interactive Mode
 
-## Error Handling
-- Skips files with encoding issues and notifies the user.
-- Handles `ImportError` for missing packages and attempts to install them.
+The script provides an interactive menu with the following options:
 
-## Notes
-- The script may detect packages that are not explicitly needed if they are dynamically imported or unused in the project.
-- Use the generated `requirements.txt` file as a starting point and manually refine it as necessary.
+1. Scan directory for Python files
+2. Detect missing packages
+3. Install missing packages
+4. Generate requirements.txt
+5. Uninstall all packages
+6. Clean package cache
+7. Exit
+
+## Package Detection Details
+
+### Import Formats Supported
+
+```python
+# Direct imports
+import package_name
+import package_name as alias
+
+# From imports
+from package_name import module
+from package_name.submodule import function
+
+# Multiple imports
+import os, sys, package_name
+```
+
+### Special Package Mappings
+
+Some packages have different import and installation names. The script handles these cases:
+
+- `PIL` → Installs as `Pillow`
+- `gi` → Installs as `PyGObject`
+
+### Invalid Package Patterns
+
+The script filters out common false positives and invalid package names:
+
+- Template strings (e.g., `%(module)s`)
+- Variable markers (e.g., `${package}`)
+- HTML/XML tags
+- Paths with slashes or backslashes
+- Empty strings and whitespace
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+python -m unittest test_missing_modules.py
+
+# Run tests with verbose output
+python -m unittest test_missing_modules.py -v
+```
+
+### Test Coverage
+
+The test suite covers:
+
+- File scanning and import extraction
+- Package verification and installation
+- Standard library package exclusion
+- Invalid package pattern detection
+- Requirements.txt generation
+- Error handling scenarios
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add or update tests as needed
+5. Submit a pull request
 
 ## License
-This script is free to use and modify. No warranty is provided.
 
+This project is free to use and modify. No warranty is provided.
+
+## Credits
+
+Created and maintained by [Adryan Serage](https://github.com/adryserage).
